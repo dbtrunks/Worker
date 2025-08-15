@@ -1,0 +1,48 @@
+name: .NET
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+    - name: Restore dependencies
+      run: dotnet restore
+    - name: Build
+      run: dotnet build --no-restore
+    - name: Test
+      run: dotnet test --no-build --verbosity normal
+    - name: Publish
+      run: dotnet publish -c Release -o ./publish -r linux-x64
+    - name: Copy files
+      uses: appleboy/scp-action@v1
+      with:
+         host: ${{ secrets.HOST }}
+         username: ${{ secrets.USER }}
+         key: ${{ secrets.SSH_KEY }}
+         port: 10411
+         source: "./publish"
+         target: "/MySrv/worker"
+    - name: Restart worker
+      uses: appleboy/ssh-action@v1
+      with:
+         host: ${{ secrets.HOST }}
+         username: root
+         key: ${{ secrets.SSH_KEYR }}
+         port: 10411
+         script: |
+           systemctl restart worker.service
+           sleep 1
+           systemctl status worker.service
+
